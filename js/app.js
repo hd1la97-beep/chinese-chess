@@ -386,4 +386,13 @@
   // 啟動
   initBoard();
   showScreen('#menu');
+
+  // 修正：切換到遊戲畫面時重新計算棋盤大小
+  const originalShowScreen = showScreen;
+  showScreen = function(id) {
+    originalShowScreen(id);
+    if (id === '#game' && boardUI) {
+      setTimeout(() => boardUI.resize(), 50);
+    }
+  };
 })();
