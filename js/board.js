@@ -20,6 +20,8 @@ class BoardUI {
   }
 
   resize() {
+// 如果畫面還是隱藏的，先不計算
+  if (this.canvas.offsetParent === null) return;
     const rect = this.canvas.parentElement.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.floor(rect.width);
