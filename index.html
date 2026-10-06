@@ -9,9 +9,7 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
 
     body {
@@ -79,17 +77,18 @@
     }
 
     .btn {
-      padding: 14px 20px;
-      font-size: 1.1rem;
+      padding: 16px 20px;
+      font-size: 1.2rem;
       font-weight: bold;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.2s;
-      outline: none;
       background: #b85c37;
       color: #fff;
       box-shadow: 0 4px 0 #843a1e;
+      width: 100%;
+      display: block;
+      text-align: center;
     }
 
     .btn:active {
@@ -152,12 +151,13 @@
     }
 
     .btn.small {
-      padding: 8px 16px;
-      font-size: 0.95rem;
+      padding: 10px 16px;
+      font-size: 1rem;
       background: #5c3a21;
       color: #e6c280;
       border: 1px solid #8a5a36;
       border-radius: 6px;
+      box-shadow: none;
     }
 
     /* 彈窗 */
@@ -203,15 +203,15 @@
       <h1>中國象棋</h1>
       <p class="subtitle">Xiangqi Standard Game</p>
       <div class="menu-btns">
-        <button class="btn" id="btnLocal">本地雙人對戰</button>
-        <button class="btn" id="btnAI">人機對戰 (執紅)</button>
+        <button class="btn" onclick="startMode('local')">本地雙人對戰</button>
+        <button class="btn" onclick="startMode('ai')">人機對戰 (執紅)</button>
       </div>
     </div>
 
     <!-- 遊戲畫面 -->
     <div id="game" class="screen">
       <header class="top-bar">
-        <button class="icon-btn" id="backBtn" title="返回選單">←</button>
+        <button class="icon-btn" onclick="goMenu()">←</button>
         <div class="status" id="statusText">紅方回合</div>
       </header>
 
@@ -220,8 +220,8 @@
       </div>
 
       <div class="controls">
-        <button class="btn small" id="undoBtn">悔棋</button>
-        <button class="btn small" id="restartBtn">重新開始</button>
+        <button class="btn small" onclick="doUndo()">悔棋</button>
+        <button class="btn small" onclick="doRestart()">重新開始</button>
       </div>
     </div>
 
@@ -230,480 +230,532 @@
       <div class="modal-content">
         <h2 id="resultTitle">遊戲結束</h2>
         <p id="resultMsg"></p>
-        <button class="btn" id="resultOk">確定</button>
+        <button class="btn" onclick="closeModal()">確定</button>
       </div>
     </div>
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      const R = 0, B = 1;
-      const PIECES = {
-        r_k: { name: '帥', side: R }, r_a: { name: '仕', side: R }, r_b: { name: '相', side: R },
-        r_n: { name: '馬', side: R }, r_r: { name: '車', side: R }, r_c: { name: '砲', side: R }, r_p: { name: '兵', side: R },
-        b_k: { name: '將', side: B }, b_a: { name: '士', side: B }, b_b: { name: '象', side: B },
-        b_n: { name: '馬', side: B }, b_r: { name: '車', side: B }, b_c: { name: '砲', side: B }, b_p: { name: '卒', side: B }
+    const R = 0, B = 1;
+    const PIECES = {
+      r_k: { name: '帥', side: R }, r_a: { name: '仕', side: R }, r_b: { name: '相', side: R },
+      r_n: { name: '馬', side: R }, r_r: { name: '車', side: R }, r_c: { name: '砲', side: R }, r_p: { name: '兵', side: R },
+      b_k: { name: '將', side: B }, b_a: { name: '士', side: B }, b_b: { name: '象', side: B },
+      b_n: { name: '馬', side: B }, b_r: { name: '車', side: B }, b_c: { name: '砲', side: B }, b_p: { name: '卒', side: B }
+    };
+
+    const PIECE_VALUES = { k: 10000, r: 90, c: 45, n: 40, b: 20, a: 20, p: 10 };
+
+    // 卒/兵過河評分加成（讓AI懂得推兵壓制）
+    const PAWN_VALUE_BLACK = [
+      [0,  0,  0,  0,  0,  0,  0,  0,  0],
+      [0,  0,  0,  0,  0,  0,  0,  0,  0],
+      [0,  0,  0,  0,  0,  0,  0,  0,  0],
+      [2,  0,  4,  0,  6,  0,  4,  0,  2],
+      [10, 15, 20, 25, 25, 25, 20, 15, 10],
+      [20, 30, 40, 50, 50, 50, 40, 30, 20],
+      [30, 40, 50, 60, 70, 60, 50, 40, 30],
+      [40, 50, 60, 80, 80, 80, 60, 50, 40],
+      [50, 60, 70, 90, 90, 90, 70, 60, 50],
+      [10, 20, 30, 40, 40, 40, 30, 20, 10]
+    ];
+
+    const initialBoard = [
+      ['b_r','b_n','b_b','b_a','b_k','b_a','b_b','b_n','b_r'],
+      [ null, null, null, null, null, null, null, null, null],
+      [ null,'b_c', null, null, null, null, null,'b_c', null],
+      ['b_p', null,'b_p', null,'b_p', null,'b_p', null,'b_p'],
+      [ null, null, null, null, null, null, null, null, null],
+      [ null, null, null, null, null, null, null, null, null],
+      ['r_p', null,'r_p', null,'r_p', null,'r_p', null,'r_p'],
+      [ null,'r_c', null, null, null, null, null,'r_c', null],
+      [ null, null, null, null, null, null, null, null, null],
+      ['r_r','r_n','r_b','r_a','r_k','r_a','r_b','r_n','r_r']
+    ];
+
+    let board = [];
+    let currentTurn = R;
+    let selectedPiece = null;
+    let validMoves = [];
+    let history = [];
+    let gameMode = 'local';
+    let isGameOver = false;
+    let isAiThinking = false;
+
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+
+    const PADDING = 25;
+    const CELL_SIZE = 50;
+
+    function startMode(mode) {
+      document.getElementById('menu').classList.remove('active');
+      document.getElementById('game').classList.add('active');
+      initGame(mode);
+    }
+
+    function goMenu() {
+      document.getElementById('game').classList.remove('active');
+      document.getElementById('menu').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('resultModal').classList.remove('active');
+    }
+
+    function initGame(mode) {
+      gameMode = mode;
+      board = JSON.parse(JSON.stringify(initialBoard));
+      currentTurn = R;
+      selectedPiece = null;
+      validMoves = [];
+      history = [];
+      isGameOver = false;
+      isAiThinking = false;
+      updateStatus();
+      drawBoard();
+    }
+
+    function updateStatus() {
+      if (isGameOver) return;
+      if (isAiThinking) {
+        statusText.textContent = "電腦思考中...";
+        statusText.style.color = "#333";
+        statusText.style.background = "#ffcc00";
+        return;
+      }
+      statusText.textContent = currentTurn === R ? "紅方回合" : "黑方回合";
+      statusText.style.color = currentTurn === R ? "#ff4d4d" : "#333";
+      statusText.style.background = "rgba(255,255,255,0.9)";
+    }
+
+    function drawBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#e3b074";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "#5c3a21";
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        ctx.moveTo(PADDING, PADDING + i * CELL_SIZE);
+        ctx.lineTo(PADDING + 8 * CELL_SIZE, PADDING + i * CELL_SIZE);
+        ctx.stroke();
+      }
+
+      for (let j = 0; j < 9; j++) {
+        ctx.beginPath();
+        ctx.moveTo(PADDING + j * CELL_SIZE, PADDING);
+        ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
+        ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 9 * CELL_SIZE);
+        ctx.stroke();
+
+        if (j === 0 || j === 8) {
+          ctx.beginPath();
+          ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
+          ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
+          ctx.stroke();
+        }
+      }
+
+      drawX(3, 0); drawX(3, 7);
+
+      ctx.fillStyle = "#5c3a21";
+      ctx.font = "bold 22px serif";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillText("楚 河", PADDING + 2 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
+      ctx.fillText("漢 界", PADDING + 6 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
+
+      validMoves.forEach(m => {
+        ctx.beginPath();
+        ctx.arc(PADDING + m.c * CELL_SIZE, PADDING + m.r * CELL_SIZE, 8, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0, 200, 0, 0.6)";
+        ctx.fill();
+      });
+
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 9; c++) {
+          const key = board[r][c];
+          if (key) drawPiece(r, c, key);
+        }
+      }
+
+      if (selectedPiece) {
+        ctx.strokeStyle = "#ff0000";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(
+          PADDING + selectedPiece.c * CELL_SIZE - 22,
+          PADDING + selectedPiece.r * CELL_SIZE - 22,
+          44, 44
+        );
+      }
+    }
+
+    function drawX(c, r) {
+      ctx.beginPath();
+      ctx.moveTo(PADDING + c * CELL_SIZE, PADDING + r * CELL_SIZE);
+      ctx.lineTo(PADDING + (c + 2) * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(PADDING + (c + 2) * CELL_SIZE, PADDING + r * CELL_SIZE);
+      ctx.lineTo(PADDING + c * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
+      ctx.stroke();
+    }
+
+    function drawPiece(r, c, key) {
+      const x = PADDING + c * CELL_SIZE;
+      const y = PADDING + r * CELL_SIZE;
+      const info = PIECES[key];
+      if (!info) return;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff3e0";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = info.side === R ? "#d32f2f" : "#333";
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x, y, 17, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = info.side === R ? "#d32f2f" : "#111";
+      ctx.font = "bold 20px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(info.name, x, y + 2);
+    }
+
+    function getValidMovesForBoard(b, r, c) {
+      const key = b[r][c];
+      if (!key || !PIECES[key]) return [];
+      const side = PIECES[key].side;
+      const type = key.split('_')[1];
+      let moves = [];
+
+      const addMove = (nr, nc) => {
+        if (nr < 0 || nr > 9 || nc < 0 || nc > 8) return false;
+        const target = b[nr][nc];
+        if (!target) {
+          moves.push({ r: nr, c: nc });
+          return true;
+        }
+        if (PIECES[target] && PIECES[target].side !== side) {
+          moves.push({ r: nr, c: nc });
+        }
+        return false;
       };
 
-      const PIECE_VALUES = { k: 10000, r: 90, c: 45, n: 40, b: 20, a: 20, p: 10 };
-
-      const initialBoard = [
-        ['b_r','b_n','b_b','b_a','b_k','b_a','b_b','b_n','b_r'],
-        [ null, null, null, null, null, null, null, null, null],
-        [ null,'b_c', null, null, null, null, null,'b_c', null],
-        ['b_p', null,'b_p', null,'b_p', null,'b_p', null,'b_p'],
-        [ null, null, null, null, null, null, null, null, null],
-        [ null, null, null, null, null, null, null, null, null],
-        ['r_p', null,'r_p', null,'r_p', null,'r_p', null,'r_p'],
-        [ null,'r_c', null, null, null, null, null,'r_c', null],
-        [ null, null, null, null, null, null, null, null, null],
-        ['r_r','r_n','r_b','r_a','r_k','r_a','r_b','r_n','r_r']
-      ];
-
-      let board = [];
-      let currentTurn = R;
-      let selectedPiece = null;
-      let validMoves = [];
-      let history = [];
-      let gameMode = 'local';
-      let isGameOver = false;
-      let isAiThinking = false;
-
-      const canvas = document.getElementById('board');
-      const ctx = canvas ? canvas.getContext('2d') : null;
-      const statusText = document.getElementById('statusText');
-
-      const PADDING = 25;
-      const CELL_SIZE = 50;
-
-      function initGame(mode) {
-        gameMode = mode;
-        board = JSON.parse(JSON.stringify(initialBoard));
-        currentTurn = R;
-        selectedPiece = null;
-        validMoves = [];
-        history = [];
-        isGameOver = false;
-        isAiThinking = false;
-        updateStatus();
-        drawBoard();
-      }
-
-      function updateStatus() {
-        if (!statusText || isGameOver) return;
-        if (isAiThinking) {
-          statusText.textContent = "電腦思考中...";
-          statusText.style.color = "#333";
-          statusText.style.background = "#ffcc00";
-          return;
-        }
-        statusText.textContent = currentTurn === R ? "紅方回合" : "黑方回合";
-        statusText.style.color = currentTurn === R ? "#ff4d4d" : "#333";
-        statusText.style.background = "rgba(255,255,255,0.9)";
-      }
-
-      function drawBoard() {
-        if (!ctx) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#e3b074";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.strokeStyle = "#5c3a21";
-        ctx.lineWidth = 2;
-
-        for (let i = 0; i < 10; i++) {
-          ctx.beginPath();
-          ctx.moveTo(PADDING, PADDING + i * CELL_SIZE);
-          ctx.lineTo(PADDING + 8 * CELL_SIZE, PADDING + i * CELL_SIZE);
-          ctx.stroke();
-        }
-
-        for (let j = 0; j < 9; j++) {
-          ctx.beginPath();
-          ctx.moveTo(PADDING + j * CELL_SIZE, PADDING);
-          ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
-          ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 9 * CELL_SIZE);
-          ctx.stroke();
-
-          if (j === 0 || j === 8) {
-            ctx.beginPath();
-            ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
-            ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
-            ctx.stroke();
+      if (type === 'r') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc;
+          while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+            if (!addMove(nr, nc)) break;
+            nr += dr; nc += dc;
           }
-        }
-
-        drawX(3, 0); drawX(3, 7);
-
-        ctx.fillStyle = "#5c3a21";
-        ctx.font = "bold 22px serif";
-        ctx.textBaseline = "middle";
-        ctx.textAlign = "center";
-        ctx.fillText("楚 河", PADDING + 2 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
-        ctx.fillText("漢 界", PADDING + 6 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
-
-        validMoves.forEach(m => {
-          ctx.beginPath();
-          ctx.arc(PADDING + m.c * CELL_SIZE, PADDING + m.r * CELL_SIZE, 8, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(0, 200, 0, 0.6)";
-          ctx.fill();
         });
-
-        for (let r = 0; r < 10; r++) {
-          for (let c = 0; c < 9; c++) {
-            const key = board[r][c];
-            if (key) drawPiece(r, c, key);
+      } else if (type === 'n') {
+        const horseMoves = [
+          { dr: -2, dc: -1, legR: -1, legC: 0 }, { dr: -2, dc: 1, legR: -1, legC: 0 },
+          { dr: 2, dc: -1, legR: 1, legC: 0 },   { dr: 2, dc: 1, legR: 1, legC: 0 },
+          { dr: -1, dc: -2, legR: 0, legC: -1 }, { dr: 1, dc: -2, legR: 0, legC: -1 },
+          { dr: -1, dc: 2, legR: 0, legC: 1 },   { dr: 1, dc: 2, legR: 0, legC: 1 }
+        ];
+        horseMoves.forEach(m => {
+          const legR = r + m.legR, legC = c + m.legC;
+          if (legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !b[legR][legC]) {
+            addMove(r + m.dr, c + m.dc);
           }
-        }
-
-        if (selectedPiece) {
-          ctx.strokeStyle = "#ff0000";
-          ctx.lineWidth = 3;
-          ctx.strokeRect(
-            PADDING + selectedPiece.c * CELL_SIZE - 22,
-            PADDING + selectedPiece.r * CELL_SIZE - 22,
-            44, 44
-          );
-        }
-      }
-
-      function drawX(c, r) {
-        ctx.beginPath();
-        ctx.moveTo(PADDING + c * CELL_SIZE, PADDING + r * CELL_SIZE);
-        ctx.lineTo(PADDING + (c + 2) * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(PADDING + (c + 2) * CELL_SIZE, PADDING + r * CELL_SIZE);
-        ctx.lineTo(PADDING + c * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
-        ctx.stroke();
-      }
-
-      function drawPiece(r, c, key) {
-        const x = PADDING + c * CELL_SIZE;
-        const y = PADDING + r * CELL_SIZE;
-        const info = PIECES[key];
-        if (!info) return;
-
-        ctx.beginPath();
-        ctx.arc(x, y, 20, 0, Math.PI * 2);
-        ctx.fillStyle = "#fff3e0";
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = info.side === R ? "#d32f2f" : "#333";
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(x, y, 17, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.fillStyle = info.side === R ? "#d32f2f" : "#111";
-        ctx.font = "bold 20px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(info.name, x, y + 2);
-      }
-
-      function getValidMoves(r, c) {
-        const key = board[r][c];
-        if (!key || !PIECES[key]) return [];
-        const side = PIECES[key].side;
-        const type = key.split('_')[1];
-        let moves = [];
-
-        const addMove = (nr, nc) => {
-          if (nr < 0 || nr > 9 || nc < 0 || nc > 8) return false;
-          const target = board[nr][nc];
-          if (!target) {
-            moves.push({ r: nr, c: nc });
-            return true;
-          }
-          if (PIECES[target] && PIECES[target].side !== side) {
-            moves.push({ r: nr, c: nc });
-          }
-          return false;
-        };
-
-        if (type === 'r') {
-          const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-          dirs.forEach(([dr, dc]) => {
-            let nr = r + dr, nc = c + dc;
-            while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
-              if (!addMove(nr, nc)) break;
-              nr += dr; nc += dc;
-            }
-          });
-        } else if (type === 'n') {
-          const horseMoves = [
-            { dr: -2, dc: -1, legR: -1, legC: 0 }, { dr: -2, dc: 1, legR: -1, legC: 0 },
-            { dr: 2, dc: -1, legR: 1, legC: 0 },   { dr: 2, dc: 1, legR: 1, legC: 0 },
-            { dr: -1, dc: -2, legR: 0, legC: -1 }, { dr: 1, dc: -2, legR: 0, legC: -1 },
-            { dr: -1, dc: 2, legR: 0, legC: 1 },   { dr: 1, dc: 2, legR: 0, legC: 1 }
-          ];
-          horseMoves.forEach(m => {
-            const legR = r + m.legR, legC = c + m.legC;
-            if (legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !board[legR][legC]) {
-              addMove(r + m.dr, c + m.dc);
-            }
-          });
-        } else if (type === 'c') {
-          const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-          dirs.forEach(([dr, dc]) => {
-            let nr = r + dr, nc = c + dc;
-            let jumped = false;
-            while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
-              const target = board[nr][nc];
-              if (!jumped) {
-                if (!target) moves.push({ r: nr, c: nc });
-                else jumped = true;
-              } else {
-                if (target) {
-                  if (PIECES[target] && PIECES[target].side !== side) moves.push({ r: nr, c: nc });
-                  break;
-                }
+        });
+      } else if (type === 'c') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc;
+          let jumped = false;
+          while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+            const target = b[nr][nc];
+            if (!jumped) {
+              if (!target) moves.push({ r: nr, c: nc });
+              else jumped = true;
+            } else {
+              if (target) {
+                if (PIECES[target] && PIECES[target].side !== side) moves.push({ r: nr, c: nc });
+                break;
               }
-              nr += dr; nc += dc;
             }
-          });
-        } else if (type === 'k') {
-          const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-          dirs.forEach(([dr, dc]) => {
-            const nr = r + dr, nc = c + dc;
-            if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
-              addMove(nr, nc);
-            }
-          });
-        } else if (type === 'a') {
-          const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
-          dirs.forEach(([dr, dc]) => {
-            const nr = r + dr, nc = c + dc;
-            if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
-              addMove(nr, nc);
-            }
-          });
-        } else if (type === 'b') {
-          const dirs = [
-            { dr: -2, dc: -2, legR: -1, legC: -1 }, { dr: -2, dc: 2, legR: -1, legC: 1 },
-            { dr: 2, dc: -2, legR: 1, legC: -1 },   { dr: 2, dc: 2, legR: 1, legC: 1 }
-          ];
-          dirs.forEach(m => {
-            const nr = r + m.dr, nc = c + m.dc;
-            const legR = r + m.legR, legC = c + m.legC;
-            const validRiver = (side === R && nr >= 5) || (side === B && nr <= 4);
-            if (validRiver && legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !board[legR][legC]) {
-              addMove(nr, nc);
-            }
-          });
-        } else if (type === 'p') {
-          const dir = side === R ? -1 : 1;
-          addMove(r + dir, c);
-          const crossed = (side === R && r <= 4) || (side === B && r >= 5);
-          if (crossed) {
-            addMove(r, c - 1);
-            addMove(r, c + 1);
+            nr += dr; nc += dc;
           }
+        });
+      } else if (type === 'k') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          const nr = r + dr, nc = c + dc;
+          if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'a') {
+        const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+        dirs.forEach(([dr, dc]) => {
+          const nr = r + dr, nc = c + dc;
+          if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'b') {
+        const dirs = [
+          { dr: -2, dc: -2, legR: -1, legC: -1 }, { dr: -2, dc: 2, legR: -1, legC: 1 },
+          { dr: 2, dc: -2, legR: 1, legC: -1 },   { dr: 2, dc: 2, legR: 1, legC: 1 }
+        ];
+        dirs.forEach(m => {
+          const nr = r + m.dr, nc = c + m.dc;
+          const legR = r + m.legR, legC = c + m.legC;
+          const validRiver = (side === R && nr >= 5) || (side === B && nr <= 4);
+          if (validRiver && legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !b[legR][legC]) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'p') {
+        const dir = side === R ? -1 : 1;
+        addMove(r + dir, c);
+        const crossed = (side === R && r <= 4) || (side === B && r >= 5);
+        if (crossed) {
+          addMove(r, c - 1);
+          addMove(r, c + 1);
         }
-
-        return moves;
       }
 
-      function executeMove(fromR, fromC, toR, toC) {
-        const captured = board[toR][toC];
-        history.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC }, captured, piece: board[fromR][fromC] });
+      return moves;
+    }
 
-        board[toR][toC] = board[fromR][fromC];
-        board[fromR][fromC] = null;
+    function getValidMoves(r, c) {
+      return getValidMovesForBoard(board, r, c);
+    }
 
-        selectedPiece = null;
-        validMoves = [];
+    function executeMove(fromR, fromC, toR, toC) {
+      const captured = board[toR][toC];
+      history.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC }, captured, piece: board[fromR][fromC] });
 
-        if (captured === 'b_k') {
-          drawBoard();
-          endGame("紅方獲勝！");
-          return;
-        } else if (captured === 'r_k') {
-          drawBoard();
-          endGame("黑方獲勝！");
-          return;
-        }
+      board[toR][toC] = board[fromR][fromC];
+      board[fromR][fromC] = null;
 
-        currentTurn = (currentTurn === R) ? B : R;
-        updateStatus();
+      selectedPiece = null;
+      validMoves = [];
+
+      if (captured === 'b_k') {
         drawBoard();
-
-        if (gameMode === 'ai' && currentTurn === B && !isGameOver) {
-          isAiThinking = true;
-          updateStatus();
-          setTimeout(makeAIMove, 200);
-        }
+        endGame("紅方獲勝！");
+        return;
+      } else if (captured === 'r_k') {
+        drawBoard();
+        endGame("黑方獲勝！");
+        return;
       }
 
-      function evaluateBoard(b) {
-        let score = 0;
-        for (let r = 0; r < 10; r++) {
-          for (let c = 0; c < 9; c++) {
-            const key = b[r][c];
-            if (!key || !PIECES[key]) continue;
-            const side = PIECES[key].side;
-            const type = key.split('_')[1];
-            let val = PIECE_VALUES[type] || 0;
-            if (side === B) score += val;
-            else score -= val;
+      currentTurn = (currentTurn === R) ? B : R;
+      updateStatus();
+      drawBoard();
+
+      if (gameMode === 'ai' && currentTurn === B && !isGameOver) {
+        isAiThinking = true;
+        updateStatus();
+        setTimeout(makeAIMove, 100);
+      }
+    }
+
+    // 局勢評估（分數越高對黑方越有利）
+    function evaluateBoard(b) {
+      let score = 0;
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 9; c++) {
+          const key = b[r][c];
+          if (!key || !PIECES[key]) continue;
+          const side = PIECES[key].side;
+          const type = key.split('_')[1];
+          let val = PIECE_VALUES[type] || 0;
+
+          if (type === 'p' && side === B) {
+            val += PAWN_VALUE_BLACK[r][c];
+          }
+
+          if (side === B) score += val;
+          else score -= val;
+        }
+      }
+      return score;
+    }
+
+    function getAllLegalMoves(b, side) {
+      let moves = [];
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (b[r][c] && PIECES[b[r][c]] && PIECES[b[r][c]].side === side) {
+            const list = getValidMovesForBoard(b, r, c);
+            list.forEach(m => moves.push({ from: { r, c }, to: m }));
           }
         }
-        return score;
+      }
+      return moves;
+    }
+
+    // AI 兩層極小化極大搜尋（Minimax Engine），預測玩家下一步反擊
+    function makeAIMove() {
+      if (isGameOver) return;
+      let allMoves = getAllLegalMoves(board, B);
+
+      if (allMoves.length === 0) {
+        isAiThinking = false;
+        endGame("紅方獲勝！");
+        return;
       }
 
-      function makeAIMove() {
-        if (isGameOver) return;
-        let allMoves = [];
-        for (let r = 0; r < 10; r++) {
-          for (let c = 0; c < 9; c++) {
-            if (board[r][c] && PIECES[board[r][c]] && PIECES[board[r][c]].side === B) {
-              const moves = getValidMoves(r, c);
-              moves.forEach(m => allMoves.push({ from: { r, c }, to: m }));
-            }
-          }
-        }
+      let bestMove = null;
+      let bestScore = -Infinity;
 
-        if (allMoves.length === 0) {
-          isAiThinking = false;
-          endGame("紅方獲勝！");
-          return;
-        }
+      for (let i = 0; i < allMoves.length; i++) {
+        const move = allMoves[i];
+        const targetPiece = board[move.to.r][move.to.c];
+        const sourcePiece = board[move.from.r][move.from.c];
 
-        let bestMove = null;
-        let bestScore = -Infinity;
+        // 模擬黑方走棋
+        board[move.to.r][move.to.c] = sourcePiece;
+        board[move.from.r][move.from.c] = null;
 
-        for (let i = 0; i < allMoves.length; i++) {
-          const move = allMoves[i];
-          const targetPiece = board[move.to.r][move.to.c];
-          const sourcePiece = board[move.from.r][move.from.c];
-
-          board[move.to.r][move.to.c] = sourcePiece;
-          board[move.from.r][move.from.c] = null;
-
-          let currentScore = evaluateBoard(board);
-
+        if (targetPiece === 'r_k') {
+          // 直接將死帥
           board[move.from.r][move.from.c] = sourcePiece;
           board[move.to.r][move.to.c] = targetPiece;
-
-          if (currentScore > bestScore) {
-            bestScore = currentScore;
-            bestMove = move;
-          }
+          bestMove = move;
+          break;
         }
 
-        const chosen = bestMove || allMoves[Math.floor(Math.random() * allMoves.length)];
-        isAiThinking = false;
-        executeMove(chosen.from.r, chosen.from.c, chosen.to.r, chosen.to.c);
-      }
+        // 模擬紅方最強反擊（極小化 AI 的得分）
+        let redMoves = getAllLegalMoves(board, R);
+        let minRedScore = Infinity;
 
-      function handleInteraction(clientX, clientY) {
-        if (isGameOver || isAiThinking) return;
-        if (gameMode === 'ai' && currentTurn === B) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-
-        const x = (clientX - rect.left) * scaleX;
-        const y = (clientY - rect.top) * scaleY;
-
-        const c = Math.round((x - PADDING) / CELL_SIZE);
-        const r = Math.round((y - PADDING) / CELL_SIZE);
-
-        if (r < 0 || r > 9 || c < 0 || c > 8) return;
-
-        if (selectedPiece) {
-          const isValid = validMoves.some(m => m.r === r && m.c === c);
-          if (isValid) {
-            executeMove(selectedPiece.r, selectedPiece.c, r, c);
-            return;
-          }
-        }
-
-        const clickedKey = board[r][c];
-        if (clickedKey && PIECES[clickedKey] && PIECES[clickedKey].side === currentTurn) {
-          selectedPiece = { r, c };
-          validMoves = getValidMoves(r, c);
-          drawBoard();
+        if (redMoves.length === 0) {
+          minRedScore = 99999;
         } else {
-          selectedPiece = null;
-          validMoves = [];
-          drawBoard();
+          for (let j = 0; j < redMoves.length; j++) {
+            const rMove = redMoves[j];
+            const rTarget = board[rMove.to.r][rMove.to.c];
+            const rSource = board[rMove.from.r][rMove.from.c];
+
+            board[rMove.to.r][rMove.to.c] = rSource;
+            board[rMove.from.r][rMove.from.c] = null;
+
+            let evalScore = evaluateBoard(board);
+
+            board[rMove.from.r][rMove.from.c] = rSource;
+            board[rMove.to.r][rMove.to.c] = rTarget;
+
+            if (evalScore < minRedScore) {
+              minRedScore = evalScore;
+            }
+          }
+        }
+
+        // 還原黑方模擬
+        board[move.from.r][move.from.c] = sourcePiece;
+        board[move.to.r][move.to.c] = targetPiece;
+
+        if (minRedScore > bestScore) {
+          bestScore = minRedScore;
+          bestMove = move;
         }
       }
 
-      if (canvas) {
-        canvas.addEventListener('click', function(e) {
-          handleInteraction(e.clientX, e.clientY);
-        });
+      const chosen = bestMove || allMoves[Math.floor(Math.random() * allMoves.length)];
+      isAiThinking = false;
+      executeMove(chosen.from.r, chosen.from.c, chosen.to.r, chosen.to.c);
+    }
 
-        canvas.addEventListener('touchstart', function(e) {
-          if (e.touches.length > 0) {
-            handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
-          }
-        }, { passive: true });
+    function handleTouch(e) {
+      e.preventDefault();
+      if (isGameOver || isAiThinking) return;
+      if (gameMode === 'ai' && currentTurn === B) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      let clientX, clientY;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
       }
 
-      function endGame(msg) {
-        isGameOver = true;
-        document.getElementById('resultTitle').textContent = "遊戲結束";
-        document.getElementById('resultMsg').textContent = msg;
-        document.getElementById('resultModal').classList.add('active');
-      }
+      const x = (clientX - rect.left) * scaleX;
+      const y = (clientY - rect.top) * scaleY;
 
-      // 按鈕綁定
-      const menuScreen = document.getElementById('menu');
-      const gameScreen = document.getElementById('game');
+      const c = Math.round((x - PADDING) / CELL_SIZE);
+      const r = Math.round((y - PADDING) / CELL_SIZE);
 
-      document.getElementById('btnLocal').onclick = function() {
-        menuScreen.classList.remove('active');
-        gameScreen.classList.add('active');
-        initGame('local');
-      };
+      if (r < 0 || r > 9 || c < 0 || c > 8) return;
 
-      document.getElementById('btnAI').onclick = function() {
-        menuScreen.classList.remove('active');
-        gameScreen.classList.add('active');
-        initGame('ai');
-      };
-
-      document.getElementById('backBtn').onclick = function() {
-        gameScreen.classList.remove('active');
-        menuScreen.classList.add('active');
-      };
-
-      document.getElementById('undoBtn').onclick = function() {
-        if (history.length === 0 || isGameOver || isAiThinking) return;
-        let steps = (gameMode === 'ai' && history.length >= 2) ? 2 : 1;
-        for (let i = 0; i < steps; i++) {
-          const last = history.pop();
-          if (last) {
-            board[last.from.r][last.from.c] = last.piece;
-            board[last.to.r][last.to.c] = last.captured;
-            currentTurn = PIECES[last.piece].side;
-          }
+      if (selectedPiece) {
+        const isValid = validMoves.some(m => m.r === r && m.c === c);
+        if (isValid) {
+          executeMove(selectedPiece.r, selectedPiece.c, r, c);
+          return;
         }
+      }
+
+      const clickedKey = board[r][c];
+      if (clickedKey && PIECES[clickedKey] && PIECES[clickedKey].side === currentTurn) {
+        selectedPiece = { r, c };
+        validMoves = getValidMoves(r, c);
+        drawBoard();
+      } else {
         selectedPiece = null;
         validMoves = [];
-        updateStatus();
         drawBoard();
-      };
+      }
+    }
 
-      document.getElementById('restartBtn').onclick = function() {
-        initGame(gameMode);
-      };
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('mousedown', handleTouch);
 
-      document.getElementById('resultOk').onclick = function() {
-        document.getElementById('resultModal').classList.remove('active');
-      };
-    });
+    function endGame(msg) {
+      isGameOver = true;
+      document.getElementById('resultTitle').textContent = "遊戲結束";
+      document.getElementById('resultMsg').textContent = msg;
+      document.getElementById('resultModal').classList.add('active');
+    }
+
+    function doUndo() {
+      if (history.length === 0 || isGameOver || isAiThinking) return;
+      let steps = (gameMode === 'ai' && history.length >= 2) ? 2 : 1;
+      for (let i = 0; i < steps; i++) {
+        const last = history.pop();
+        if (last) {
+          board[last.from.r][last.from.c] = last.piece;
+          board[last.to.r][last.to.c] = last.captured;
+          currentTurn = PIECES[last.piece].side;
+        }
+      }
+      selectedPiece = null;
+      validMoves = [];
+      updateStatus();
+      drawBoard();
+    }
+
+    function doRestart() {
+      initGame(gameMode);
+    }
   </script>
 </body>
 </html>
