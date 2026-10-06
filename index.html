@@ -6,25 +6,215 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#8B4513" />
   <title>中國象棋 · Xiangqi</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #2c1810;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 500px;
+      height: 100vh;
+      max-height: 900px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #3a2218;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      padding: 15px;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* 主選單 */
+    #menu {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(135deg, #4a2810 0%, #2a1205 100%);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      color: #e6c280;
+      margin-bottom: 5px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+    }
+
+    .subtitle {
+      color: #a88a68;
+      margin-bottom: 40px;
+      font-size: 1.1rem;
+    }
+
+    .menu-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 80%;
+      max-width: 280px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    .btn.primary {
+      background: #b85c37;
+      color: #fff;
+      box-shadow: 0 4px 0 #843a1e;
+    }
+
+    .btn.primary:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #843a1e;
+    }
+
+    /* 遊戲區域 */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .icon-btn {
+      background: #5c3a21;
+      border: 1px solid #8a5a36;
+      color: #fff;
+      font-size: 1.2rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .status {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #ffd700;
+      background: rgba(0,0,0,0.3);
+      padding: 6px 16px;
+      border-radius: 20px;
+    }
+
+    .board-wrapper {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      position: relative;
+    }
+
+    canvas {
+      background-color: #e3b074;
+      border-radius: 8px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+      touch-action: none;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 10px;
+      gap: 10px;
+    }
+
+    .btn.small {
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      background: #5c3a21;
+      color: #e6c280;
+      border: 1px solid #8a5a36;
+      border-radius: 6px;
+    }
+
+    .btn.small:active {
+      background: #7a4e2d;
+    }
+
+    /* 彈窗 */
+    .modal {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #4a2810;
+      padding: 25px;
+      border-radius: 12px;
+      text-align: center;
+      border: 2px solid #8a5a36;
+      width: 80%;
+      max-width: 300px;
+    }
+
+    .modal-content h2 {
+      color: #ffd700;
+      margin-bottom: 10px;
+    }
+
+    .modal-content p {
+      margin-bottom: 20px;
+      font-size: 1.1rem;
+    }
+  </style>
 </head>
 <body>
   <div id="app">
     <!-- 主選單 -->
     <div id="menu" class="screen active">
       <h1>中國象棋</h1>
-      <p class="subtitle">Xiangqi Online</p>
+      <p class="subtitle">Xiangqi Standard Game</p>
       <div class="menu-btns">
-        <button class="btn primary" data-mode="local">本地雙人對戰</button>
-        <button class="btn primary" data-mode="ai">人機對戰</button>
-        <button class="btn accent" data-mode="create">建立房間（線上）</button>
-        <button class="btn accent" data-mode="join">加入房間</button>
+        <button class="btn primary" id="btnLocal">本地雙人對戰</button>
+        <button class="btn primary" id="btnAI">人機對戰 (執紅)</button>
       </div>
-      <div class="join-box" id="joinBox" style="display:none">
-        <input type="text" id="roomCodeInput" placeholder="輸入房間代碼" maxlength="8" autocomplete="off" />
-        <button class="btn" id="joinConfirmBtn">連線</button>
-      </div>
-      <p class="hint">線上對戰使用 PeerJS 點對點連線，無需帳號</p>
     </div>
 
     <!-- 遊戲畫面 -->
@@ -32,10 +222,6 @@
       <header class="top-bar">
         <button class="icon-btn" id="backBtn" title="返回選單">←</button>
         <div class="status" id="statusText">紅方回合</div>
-        <div class="room-info" id="roomInfo" style="display:none">
-          房間：<span id="roomCodeDisplay"></span>
-          <button class="copy-btn" id="copyCodeBtn">複製</button>
-        </div>
       </header>
 
       <div class="board-wrapper">
@@ -44,13 +230,7 @@
 
       <div class="controls">
         <button class="btn small" id="undoBtn">悔棋</button>
-        <button class="btn small" id="resignBtn">認輸</button>
         <button class="btn small" id="restartBtn">重新開始</button>
-      </div>
-
-      <div class="side-info">
-        <div class="player red">紅方 <span id="redSide"></span></div>
-        <div class="player black">黑方 <span id="blackSide"></span></div>
       </div>
     </div>
 
@@ -62,21 +242,280 @@
         <button class="btn primary" id="resultOk">確定</button>
       </div>
     </div>
-
-    <!-- 連線中提示 -->
-    <div id="connecting" class="modal">
-      <div class="modal-content">
-        <p>正在連線中...</p>
-        <div class="spinner"></div>
-      </div>
-    </div>
   </div>
 
-  <script src="lib/peerjs.min.js"></script>
-  <script src="lib/xiangqi.js"></script>
-  <script src="js/board.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/multiplayer.js"></script>
-  <script src="js/app.js"></script>
-</body>
-</html>
+  <script>
+    const R = 0, B = 1;
+    const PIECES = {
+      r_k: { name: '帥', side: R }, r_a: { name: '仕', side: R }, r_b: { name: '相', side: R },
+      r_n: { name: '馬', side: R }, r_r: { name: '車', side: R }, r_c: { name: '砲', side: R }, r_p: { name: '兵', side: R },
+      b_k: { name: '將', side: B }, b_a: { name: '士', side: B }, b_b: { name: '象', side: B },
+      b_n: { name: '馬', side: B }, b_r: { name: '車', side: B }, b_c: { name: '砲', side: B }, b_p: { name: '卒', side: B }
+    };
+
+    const PIECE_VALUES = { k: 10000, r: 90, c: 45, n: 40, b: 20, a: 20, p: 10 };
+
+    const initialBoard = [
+      ['b_r','b_n','b_b','b_a','b_k','b_a','b_b','b_n','b_r'],
+      [ null, null, null, null, null, null, null, null, null],
+      [ null,'b_c', null, null, null, null, null,'b_c', null],
+      ['b_p', null,'b_p', null,'b_p', null,'b_p', null,'b_p'],
+      [ null, null, null, null, null, null, null, null, null],
+      [ null, null, null, null, null, null, null, null, null],
+      ['r_p', null,'r_p', null,'r_p', null,'r_p', null,'r_p'],
+      [ null,'r_c', null, null, null, null, null,'r_c', null],
+      [ null, null, null, null, null, null, null, null, null],
+      ['r_r','r_n','r_b','r_a','r_k','r_a','r_b','r_n','r_r']
+    ];
+
+    let board = [];
+    let currentTurn = R;
+    let selectedPiece = null;
+    let validMoves = [];
+    let history = [];
+    let gameMode = 'local';
+    let isGameOver = false;
+    let isAiThinking = false;
+
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+
+    const PADDING = 25;
+    const CELL_SIZE = 50;
+
+    function initGame(mode) {
+      gameMode = mode;
+      board = JSON.parse(JSON.stringify(initialBoard));
+      currentTurn = R;
+      selectedPiece = null;
+      validMoves = [];
+      history = [];
+      isGameOver = false;
+      isAiThinking = false;
+      updateStatus();
+      drawBoard();
+    }
+
+    function updateStatus() {
+      if (isGameOver) return;
+      if (isAiThinking) {
+        statusText.textContent = "電腦思考中...";
+        statusText.style.color = "#333";
+        statusText.style.background = "#ffcc00";
+        return;
+      }
+      statusText.textContent = currentTurn === R ? "紅方回合" : "黑方回合";
+      statusText.style.color = currentTurn === R ? "#ff4d4d" : "#555";
+      statusText.style.background = currentTurn === R ? "rgba(255,255,255,0.9)" : "#ccc";
+    }
+
+    function drawBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#e3b074";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "#5c3a21";
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        ctx.moveTo(PADDING, PADDING + i * CELL_SIZE);
+        ctx.lineTo(PADDING + 8 * CELL_SIZE, PADDING + i * CELL_SIZE);
+        ctx.stroke();
+      }
+
+      for (let j = 0; j < 9; j++) {
+        ctx.beginPath();
+        ctx.moveTo(PADDING + j * CELL_SIZE, PADDING);
+        ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
+        ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 9 * CELL_SIZE);
+        ctx.stroke();
+
+        if (j === 0 || j === 8) {
+          ctx.beginPath();
+          ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
+          ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
+          ctx.stroke();
+        }
+      }
+
+      drawX(3, 0); drawX(3, 7);
+
+      ctx.fillStyle = "#5c3a21";
+      ctx.font = "bold 22px Kaishi, KaiTi, serif";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillText("楚 河", PADDING + 2 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
+      ctx.fillText("漢 界", PADDING + 6 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
+
+      validMoves.forEach(m => {
+        ctx.beginPath();
+        ctx.arc(PADDING + m.c * CELL_SIZE, PADDING + m.r * CELL_SIZE, 8, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0, 200, 0, 0.6)";
+        ctx.fill();
+      });
+
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 9; c++) {
+          const key = board[r][c];
+          if (key) drawPiece(r, c, key);
+        }
+      }
+
+      if (selectedPiece) {
+        ctx.strokeStyle = "#ff0000";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(
+          PADDING + selectedPiece.c * CELL_SIZE - 22,
+          PADDING + selectedPiece.r * CELL_SIZE - 22,
+          44, 44
+        );
+      }
+    }
+
+    function drawX(c, r) {
+      ctx.beginPath();
+      ctx.moveTo(PADDING + c * CELL_SIZE, PADDING + r * CELL_SIZE);
+      ctx.lineTo(PADDING + (c + 2) * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(PADDING + (c + 2) * CELL_SIZE, PADDING + r * CELL_SIZE);
+      ctx.lineTo(PADDING + c * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
+      ctx.stroke();
+    }
+
+    function drawPiece(r, c, key) {
+      const x = PADDING + c * CELL_SIZE;
+      const y = PADDING + r * CELL_SIZE;
+      const info = PIECES[key];
+      if (!info) return;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff3e0";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = info.side === R ? "#d32f2f" : "#333";
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x, y, 17, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = info.side === R ? "#d32f2f" : "#111";
+      ctx.font = "bold 20px KaiTi, Microsoft JhengHei, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(info.name, x, y + 2);
+    }
+
+    function getValidMoves(r, c) {
+      const key = board[r][c];
+      if (!key || !PIECES[key]) return [];
+      const side = PIECES[key].side;
+      const type = key.split('_')[1];
+      let moves = [];
+
+      const addMove = (nr, nc) => {
+        if (nr < 0 || nr > 9 || nc < 0 || nc > 8) return false;
+        const target = board[nr][nc];
+        if (!target) {
+          moves.push({ r: nr, c: nc });
+          return true;
+        }
+        if (PIECES[target] && PIECES[target].side !== side) {
+          moves.push({ r: nr, c: nc });
+        }
+        return false;
+      };
+
+      if (type === 'r') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc;
+          while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+            if (!addMove(nr, nc)) break;
+            nr += dr; nc += dc;
+          }
+        });
+      } else if (type === 'n') {
+        const horseMoves = [
+          { dr: -2, dc: -1, legR: -1, legC: 0 }, { dr: -2, dc: 1, legR: -1, legC: 0 },
+          { dr: 2, dc: -1, legR: 1, legC: 0 },   { dr: 2, dc: 1, legR: 1, legC: 0 },
+          { dr: -1, dc: -2, legR: 0, legC: -1 }, { dr: 1, dc: -2, legR: 0, legC: -1 },
+          { dr: -1, dc: 2, legR: 0, legC: 1 },   { dr: 1, dc: 2, legR: 0, legC: 1 }
+        ];
+        horseMoves.forEach(m => {
+          const legR = r + m.legR, legC = c + m.legC;
+          if (legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !board[legR][legC]) {
+            addMove(r + m.dr, c + m.dc);
+          }
+        });
+      } else if (type === 'c') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc;
+          let jumped = false;
+          while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+            const target = board[nr][nc];
+            if (!jumped) {
+              if (!target) moves.push({ r: nr, c: nc });
+              else jumped = true;
+            } else {
+              if (target) {
+                if (PIECES[target] && PIECES[target].side !== side) moves.push({ r: nr, c: nc });
+                break;
+              }
+            }
+            nr += dr; nc += dc;
+          }
+        });
+      } else if (type === 'k') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          const nr = r + dr, nc = c + dc;
+          if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'a') {
+        const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+        dirs.forEach(([dr, dc]) => {
+          const nr = r + dr, nc = c + dc;
+          if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'b') {
+        const dirs = [
+          { dr: -2, dc: -2, legR: -1, legC: -1 }, { dr: -2, dc: 2, legR: -1, legC: 1 },
+          { dr: 2, dc: -2, legR: 1, legC: -1 },   { dr: 2, dc: 2, legR: 1, legC: 1 }
+        ];
+        dirs.forEach(m => {
+          const nr = r + m.dr, nc = c + m.dc;
+          const legR = r + m.legR, legC = c + m.legC;
+          const validRiver = (side === R && nr >= 5) || (side === B && nr <= 4);
+          if (validRiver && legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !board[legR][legC]) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'p') {
+        const dir = side === R ? -1 : 1;
+        addMove(r + dir, c);
+        const crossed = (side === R && r <= 4) || (side === B && r >= 5);
+        if (crossed) {
+          addMove(r, c - 1);
+          addMove(r, c + 1);
+        }
+      }
+
+      return moves;
+    }
+
+    function executeMove(
