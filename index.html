@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#8B4513" />
+  <title>中國象棋 · Xiangqi</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #2c1810;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 500px;
+      height: 100vh;
+      max-height: 900px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #3a2218;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      padding: 15px;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* 主選單 */
+    #menu {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(135deg, #4a2810 0%, #2a1205 100%);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      color: #e6c280;
+      margin-bottom: 5px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+    }
+
+    .subtitle {
+      color: #a88a68;
+      margin-bottom: 40px;
+      font-size: 1.1rem;
+    }
+
+    .menu-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 80%;
+      max-width: 280px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    .btn.primary {
+      background: #b85c37;
+      color: #fff;
+      box-shadow: 0 4px 0 #843a1e;
+    }
+
+    .btn.primary:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #843a1e;
+    }
+
+    /* 遊戲區域 */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .icon-btn {
+      background: #5c3a21;
+      border: 1px solid #8a5a36;
+      color: #fff;
+      font-size: 1.2rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .status {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #ffd700;
+      background: rgba(0,0,0,0.3);
+      padding: 6px 16px;
+      border-radius: 20px;
+    }
+
+    .board-wrapper {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      position: relative;
+    }
+
+    canvas {
+      background-color: #e3b074;
+      border-radius: 8px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+      touch-action: none;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 10px;
+      gap: 10px;
+    }
+
+    .btn.small {
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      background: #5c3a21;
+      color: #e6c280;
+      border: 1px solid #8a5a36;
+      border-radius: 6px;
+    }
+
+    .btn.small:active {
+      background: #7a4e2d;
+    }
+
+    /* 彈窗 */
+    .modal {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #4a2810;
+      padding: 25px;
+      border-radius: 12px;
+      text-align: center;
+      border: 2px solid #8a5a36;
+      width: 80%;
+      max-width: 300px;
+    }
+
+    .modal-content h2 {
+      color: #ffd700;
+      margin-bottom: 10px;
+    }
+
+    .modal-content p {
+      margin-bottom: 20px;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 主選單 -->
+    <div id="menu" class="screen active">
+      <h1>中國象棋</h1>
+      <p class="subtitle">Xiangqi Standard Game</p>
+      <div class="menu-btns">
+        <button class="btn primary" id="btnLocal">本地雙人對戰</button>
+        <button class="btn primary" id="btnAI">人機對戰 (執紅)</button>
+      </div>
+    </div>
+
+    <!-- 遊戲畫面 -->
+    <div id="game" class="screen">
+      <header class="top-bar">
+        <button class="icon-btn" id="backBtn" title="返回選單">←</button>
+        <div class="status" id="statusText">紅方回合</div>
+      </header>
+
+      <div class="board-wrapper">
+        <canvas id="board" width="450" height="500"></canvas>
+      </div>
+
+      <div class="controls">
+        <button class="btn small" id="undoBtn">悔棋</button>
+        <button class="btn small" id="restartBtn">重新開始</button>
+      </div>
+    </div>
+
+    <!-- 結果彈窗 -->
+    <div id="resultModal" class="modal">
+      <div class="modal-content">
+        <h2 id="resultTitle">遊戲結束</h2>
+        <p id="resultMsg"></p>
+        <button class="btn primary" id="resultOk">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const R = 0, B = 1;
+    const PIECES = {
+      r_k: { name: '帥', side: R }, r_a: { name: '仕', side: R }, r_b: { name: '相', side: R },
+      r_n: { name: '馬', side: R }, r_r: { name: '車', side: R }, r_c: { name: '砲', side: R }, r_p: { name: '兵', side: R },
+      b_k: { name: '將', side: B }, b_a: { name: '士', side: B }, b_b: { name: '象', side: B },
+      b_n: { name: '馬', side: B }, b_r: { name: '車', side: B }, b_c: { name: '砲', side: B }, b_p: { name: '卒', side: B }
+    };
+
+    const PIECE_VALUES = { k: 10000, r: 90, c: 45, n: 40, b: 20, a: 20, p: 10 };
+
+    const initialBoard = [
+      ['b_r','b_n','b_b','b_a','b_k','b_a','b_b','b_n','b_r'],
+      [ null, null, null, null, null, null, null, null, null],
+      [ null,'b_c', null, null, null, null, null,'b_c', null],
+      ['b_p', null,'b_p', null,'b_p', null,'b_p', null,'b_p'],
+      [ null, null, null, null, null, null, null, null, null],
+      [ null, null, null, null, null, null, null, null, null],
+      ['r_p', null,'r_p', null,'r_p', null,'r_p', null,'r_p'],
+      [ null,'r_c', null, null, null, null, null,'r_c', null],
+      [ null, null, null, null, null, null, null, null, null],
+      ['r_r','r_n','r_b','r_a','r_k','r_a','r_b','r_n','r_r']
+    ];
+
+    let board = [];
+    let currentTurn = R;
+    let selectedPiece = null;
+    let validMoves = [];
+    let history = [];
+    let gameMode = 'local';
+    let isGameOver = false;
+    let isAiThinking = false;
+
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+
+    const PADDING = 25;
+    const CELL_SIZE = 50;
+
+    function initGame(mode) {
+      gameMode = mode;
+      board = JSON.parse(JSON.stringify(initialBoard));
+      currentTurn = R;
+      selectedPiece = null;
+      validMoves = [];
+      history = [];
+      isGameOver = false;
+      isAiThinking = false;
+      updateStatus();
+      drawBoard();
+    }
+
+    function updateStatus() {
+      if (isGameOver) return;
+      if (isAiThinking) {
+        statusText.textContent = "電腦思考中...";
+        statusText.style.color = "#333";
+        statusText.style.background = "#ffcc00";
+        return;
+      }
+      statusText.textContent = currentTurn === R ? "紅方回合" : "黑方回合";
+      statusText.style.color = currentTurn === R ? "#ff4d4d" : "#555";
+      statusText.style.background = currentTurn === R ? "rgba(255,255,255,0.9)" : "#ccc";
+    }
+
+    function drawBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#e3b074";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "#5c3a21";
+      ctx.lineWidth = 2;
+
+      for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        ctx.moveTo(PADDING, PADDING + i * CELL_SIZE);
+        ctx.lineTo(PADDING + 8 * CELL_SIZE, PADDING + i * CELL_SIZE);
+        ctx.stroke();
+      }
+
+      for (let j = 0; j < 9; j++) {
+        ctx.beginPath();
+        ctx.moveTo(PADDING + j * CELL_SIZE, PADDING);
+        ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
+        ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 9 * CELL_SIZE);
+        ctx.stroke();
+
+        if (j === 0 || j === 8) {
+          ctx.beginPath();
+          ctx.moveTo(PADDING + j * CELL_SIZE, PADDING + 4 * CELL_SIZE);
+          ctx.lineTo(PADDING + j * CELL_SIZE, PADDING + 5 * CELL_SIZE);
+          ctx.stroke();
+        }
+      }
+
+      drawX(3, 0); drawX(3, 7);
+
+      ctx.fillStyle = "#5c3a21";
+      ctx.font = "bold 22px Kaishi, KaiTi, serif";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillText("楚 河", PADDING + 2 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
+      ctx.fillText("漢 界", PADDING + 6 * CELL_SIZE, PADDING + 4.5 * CELL_SIZE);
+
+      validMoves.forEach(m => {
+        ctx.beginPath();
+        ctx.arc(PADDING + m.c * CELL_SIZE, PADDING + m.r * CELL_SIZE, 8, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0, 200, 0, 0.6)";
+        ctx.fill();
+      });
+
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 9; c++) {
+          const key = board[r][c];
+          if (key) drawPiece(r, c, key);
+        }
+      }
+
+      if (selectedPiece) {
+        ctx.strokeStyle = "#ff0000";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(
+          PADDING + selectedPiece.c * CELL_SIZE - 22,
+          PADDING + selectedPiece.r * CELL_SIZE - 22,
+          44, 44
+        );
+      }
+    }
+
+    function drawX(c, r) {
+      ctx.beginPath();
+      ctx.moveTo(PADDING + c * CELL_SIZE, PADDING + r * CELL_SIZE);
+      ctx.lineTo(PADDING + (c + 2) * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(PADDING + (c + 2) * CELL_SIZE, PADDING + r * CELL_SIZE);
+      ctx.lineTo(PADDING + c * CELL_SIZE, PADDING + (r + 2) * CELL_SIZE);
+      ctx.stroke();
+    }
+
+    function drawPiece(r, c, key) {
+      const x = PADDING + c * CELL_SIZE;
+      const y = PADDING + r * CELL_SIZE;
+      const info = PIECES[key];
+      if (!info) return;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff3e0";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = info.side === R ? "#d32f2f" : "#333";
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x, y, 17, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = info.side === R ? "#d32f2f" : "#111";
+      ctx.font = "bold 20px KaiTi, Microsoft JhengHei, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(info.name, x, y + 2);
+    }
+
+    function getValidMoves(r, c) {
+      const key = board[r][c];
+      if (!key || !PIECES[key]) return [];
+      const side = PIECES[key].side;
+      const type = key.split('_')[1];
+      let moves = [];
+
+      const addMove = (nr, nc) => {
+        if (nr < 0 || nr > 9 || nc < 0 || nc > 8) return false;
+        const target = board[nr][nc];
+        if (!target) {
+          moves.push({ r: nr, c: nc });
+          return true;
+        }
+        if (PIECES[target] && PIECES[target].side !== side) {
+          moves.push({ r: nr, c: nc });
+        }
+        return false;
+      };
+
+      if (type === 'r') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc;
+          while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+            if (!addMove(nr, nc)) break;
+            nr += dr; nc += dc;
+          }
+        });
+      } else if (type === 'n') {
+        const horseMoves = [
+          { dr: -2, dc: -1, legR: -1, legC: 0 }, { dr: -2, dc: 1, legR: -1, legC: 0 },
+          { dr: 2, dc: -1, legR: 1, legC: 0 },   { dr: 2, dc: 1, legR: 1, legC: 0 },
+          { dr: -1, dc: -2, legR: 0, legC: -1 }, { dr: 1, dc: -2, legR: 0, legC: -1 },
+          { dr: -1, dc: 2, legR: 0, legC: 1 },   { dr: 1, dc: 2, legR: 0, legC: 1 }
+        ];
+        horseMoves.forEach(m => {
+          const legR = r + m.legR, legC = c + m.legC;
+          if (legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !board[legR][legC]) {
+            addMove(r + m.dr, c + m.dc);
+          }
+        });
+      } else if (type === 'c') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc;
+          let jumped = false;
+          while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+            const target = board[nr][nc];
+            if (!jumped) {
+              if (!target) moves.push({ r: nr, c: nc });
+              else jumped = true;
+            } else {
+              if (target) {
+                if (PIECES[target] && PIECES[target].side !== side) moves.push({ r: nr, c: nc });
+                break;
+              }
+            }
+            nr += dr; nc += dc;
+          }
+        });
+      } else if (type === 'k') {
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        dirs.forEach(([dr, dc]) => {
+          const nr = r + dr, nc = c + dc;
+          if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'a') {
+        const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+        dirs.forEach(([dr, dc]) => {
+          const nr = r + dr, nc = c + dc;
+          if (nc >= 3 && nc <= 5 && ((side === R && nr >= 7 && nr <= 9) || (side === B && nr >= 0 && nr <= 2))) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'b') {
+        const dirs = [
+          { dr: -2, dc: -2, legR: -1, legC: -1 }, { dr: -2, dc: 2, legR: -1, legC: 1 },
+          { dr: 2, dc: -2, legR: 1, legC: -1 },   { dr: 2, dc: 2, legR: 1, legC: 1 }
+        ];
+        dirs.forEach(m => {
+          const nr = r + m.dr, nc = c + m.dc;
+          const legR = r + m.legR, legC = c + m.legC;
+          const validRiver = (side === R && nr >= 5) || (side === B && nr <= 4);
+          if (validRiver && legR >= 0 && legR <= 9 && legC >= 0 && legC <= 8 && !board[legR][legC]) {
+            addMove(nr, nc);
+          }
+        });
+      } else if (type === 'p') {
+        const dir = side === R ? -1 : 1;
+        addMove(r + dir, c);
+        const crossed = (side === R && r <= 4) || (side === B && r >= 5);
+        if (crossed) {
+          addMove(r, c - 1);
+          addMove(r, c + 1);
+        }
+      }
+
+      return moves;
+    }
+
+    function executeMove(fromR, fromC, toR, toC) {
+      const captured = board[toR][toC];
+      history.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC }, captured, piece: board[fromR][fromC] });
+
+      board[toR][toC] = board[fromR][fromC];
+      board[fromR][fromC] = null;
+
+      selectedPiece = null;
+      validMoves = [];
+
+      if (captured === 'b_k') {
+        drawBoard();
+        endGame("紅方獲勝！");
+        return;
+      } else if (captured === 'r_k') {
+        drawBoard();
+        endGame("黑方獲勝！");
+        return;
+      }
+
+      currentTurn = (currentTurn === R) ? B : R;
+      updateStatus();
+      drawBoard();
+
+      if (gameMode === 'ai' && currentTurn === B && !isGameOver) {
+        isAiThinking = true;
+        updateStatus();
+        setTimeout(makeAIMove, 200);
+      }
+    }
+
+    function evaluateBoard(currentBoard) {
+      let score = 0;
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 9; c++) {
+          const key = currentBoard[r][c];
+          if (!key || !PIECES[key]) continue;
+
+          const side = PIECES[key].side;
+          const type = key.split('_')[1];
+          let val = PIECE_VALUES[type] || 0;
+
+          if (type === 'p') {
+            if (side === B && r >= 5) val += 15;
+            if (side === R && r <= 4) val += 15;
+          }
+
+          if (side === B) score += val;
+          else score -= val;
+        }
+      }
+      return score;
+    }
+
+    function makeAIMove() {
+      if (isGameOver) return;
+
+      try {
+        let allMoves = [];
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 9; c++) {
+            if (board[r][c] && PIECES[board[r][c]] && PIECES[board[r][c]].side === B) {
+              const moves = getValidMoves(r, c);
+              moves.forEach(m => allMoves.push({ from: { r, c }, to: m }));
+            }
+          }
+        }
+
+        if (allMoves.length === 0) {
+          isAiThinking = false;
+          endGame("紅方獲勝！(黑方無路可走)");
+          return;
+        }
+
+        let winMove = allMoves.find(m => board[m.to.r][m.to.c] === 'r_k');
+        if (winMove) {
+          isAiThinking = false;
+          executeMove(winMove.from.r, winMove.from.c, winMove.to.r, winMove.to.c);
+          return;
+        }
+
+        let bestMove = null;
+        let bestScore = -Infinity;
+
+        for (let i = 0; i < allMoves.length; i++) {
+          const move = allMoves[i];
+          const targetPiece = board[move.to.r][move.to.c];
+          const sourcePiece = board[move.from.r][move.from.c];
+
+          board[move.to.r][move.to.c] = sourcePiece;
+          board[move.from.r][move.from.c] = null;
+
+          let currentScore = evaluateBoard(board);
+
+          board[move.from.r][move.from.c] = sourcePiece;
+          board[move.to.r][move.to.c] = targetPiece;
+
+          if (currentScore > bestScore) {
+            bestScore = currentScore;
+            bestMove = move;
+          }
+        }
+
+        const chosen = bestMove || allMoves[Math.floor(Math.random() * allMoves.length)];
+
+        isAiThinking = false;
+        executeMove(chosen.from.r, chosen.from.c, chosen.to.r, chosen.to.c);
+
+      } catch (err) {
+        console.error("AI 運算異常：", err);
+        isAiThinking = false;
+        let fallbackMoves = [];
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 9; c++) {
+            if (board[r][c] && PIECES[board[r][c]] && PIECES[board[r][c]].side === B) {
+              const moves = getValidMoves(r, c);
+              moves.forEach(m => fallbackMoves.push({ from: { r, c }, to: m }));
+            }
+          }
+        }
+        if (fallbackMoves.length > 0) {
+          const randMove = fallbackMoves[Math.floor(Math.random() * fallbackMoves.length)];
+          executeMove(randMove.from.r, randMove.from.c, randMove.to.r, randMove.to.c);
+        } else {
+          endGame("紅方獲勝！");
+        }
+      }
+    }
+
+    // 支援手機與電腦的精準觸控處理
+    function handleCanvasClick(e) {
+      if (isGameOver || isAiThinking) return;
+      if (gameMode === 'ai' && currentTurn === B) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      const x = (clientX - rect.left) * scaleX;
+      const y = (clientY - rect.top) * scaleY;
+
+      const c = Math.round((x - PADDING) / CELL_SIZE);
+      const r = Math.round((y - PADDING) / CELL_SIZE);
+
+      if (r < 0 || r > 9 || c < 0 || c > 8) return;
+
+      if (selectedPiece) {
+        const isValid = validMoves.some(m => m.r === r && m.c === c);
+        if (isValid) {
+          executeMove(selectedPiece.r, selectedPiece.c, r, c);
+          return;
+        }
+      }
+
+      const clickedKey = board[r][c];
+      if (clickedKey && PIECES[clickedKey] && PIECES[clickedKey].side === currentTurn) {
+        selectedPiece = { r, c };
+        validMoves = getValidMoves(r, c);
+        drawBoard();
+      } else {
+        selectedPiece = null;
+        validMoves = [];
+        drawBoard();
+      }
+    }
+
+    canvas.addEventListener('pointerdown', handleCanvasClick);
+
+    document.getElementById('undoBtn').onclick = () => {
+      if (history.length === 0 || isGameOver || isAiThinking) return;
+      let steps = (gameMode === 'ai' && history.length >= 2) ? 2 : 1;
+
+      for (let i = 0; i < steps; i++) {
+        const last = history.pop();
+        if (last) {
+          board[last.from.r][last.from.c] = last.piece;
+          board[last.to.r][last.to.c] = last.captured;
+          currentTurn = PIECES[last.piece].side;
+        }
+      }
+      selectedPiece = null;
+      validMoves = [];
+      updateStatus();
+      drawBoard();
+    };
+
+    function endGame(msg) {
+      isGameOver = true;
+      document.getElementById('resultTitle').textContent = "遊戲結束";
+      document.getElementById('resultMsg').textContent = msg;
+      document.getElementById('resultModal').classList.add('active');
+    }
+
+    document.getElementById('resultOk').onclick = () => {
+      document.getElementById('resultModal').classList.remove('active');
+    };
+
+    document.getElementById('restartBtn').onclick = () => {
+      initGame(gameMode);
+    };
+
+    const menuScreen = document.getElementById('menu');
+    const gameScreen = document.getElementById('game');
+
+    document.getElementById('btnLocal').onclick = () => {
+      menuScreen.classList.remove('active');
+      gameScreen.classList.add('active');
+      initGame('local');
+    };
+
+    document.getElementById('btnAI').onclick = () => {
+      menuScreen.classList.remove('active');
+      gameScreen.classList.add('active');
+      initGame('ai');
+    };
+
+    document.getElementById('backBtn').onclick = () => {
+      gameScreen.classList.remove('active');
+      menuScreen.classList.add('active');
+    };
+  </script>
+</body>
+</html>
